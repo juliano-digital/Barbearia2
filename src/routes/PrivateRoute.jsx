@@ -3,7 +3,7 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
 
 export const PrivateRoute = () => {
-  const [session, setSession] = useState(undefined); // undefined = ainda checando
+  const [session, setSession] = useState(undefined);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {

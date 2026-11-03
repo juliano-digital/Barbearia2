@@ -1,34 +1,42 @@
 import { useEffect, useState } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
+import { hasDemoAccess } from '../lib/demoAccess';
 
 export const AdminRoute = () => {
-  const [status, setStatus] = useState('checking'); // checking | allowed | denied
+  const [status, setStatus] = useState('checking');
 
   useEffect(() => {
     let active = true;
 
     const checkAdmin = async () => {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const session = sessionData?.session;
-
-      if (!session) {
-        if (active) setStatus('denied');
+      if (hasDemoAccess()) {
+        if (active) setStatus('allowed');
         return;
       }
 
-      const { data: userRow, error } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', session.user.id)
-        .single();
+      try {
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        const session = sessionData?.session;
 
-      if (error || !userRow || userRow.role !== 'admin') {
+        if (!session) {
+          if (active) setStatus('denied');
+          return;
+        }
+
+        const { data: userRow, error } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', session.user.id)
+          .single();
+        if (error) throw error;
+
+        if (active) setStatus(userRow?.role === 'admin' ? 'allowed' : 'denied');
+      } catch (error) {
+        console.error('Erro ao verificar permissão administrativa:', error);
         if (active) setStatus('denied');
-        return;
       }
-
-      if (active) setStatus('allowed');
     };
 
     checkAdmin();

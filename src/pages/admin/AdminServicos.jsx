@@ -14,14 +14,20 @@ export const AdminServicos = () => {
 
   useEffect(() => {
     const load = async () => {
-      const data = await getPageContent('servicos');
-      if (data) {
-        setIntro({ servicos_title: data.servicos_title || '', servicos_subtitle: data.servicos_subtitle || '' });
-        setItems(Array.isArray(data.items) && data.items.length ? data.items : [emptyItem()]);
-      } else {
-        setItems([emptyItem()]);
+      try {
+        const data = await getPageContent('servicos');
+        if (data) {
+          setIntro({ servicos_title: data.servicos_title || '', servicos_subtitle: data.servicos_subtitle || '' });
+          setItems(Array.isArray(data.items) && data.items.length ? data.items : [emptyItem()]);
+        } else {
+          setItems([emptyItem()]);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar serviços:', error);
+        toast.error(`Erro ao carregar conteúdo: ${error.message}`);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     load();
   }, []);
@@ -40,8 +46,9 @@ export const AdminServicos = () => {
       await savePageContent('servicos', { ...intro, items: cleanItems });
       setItems(cleanItems.length ? cleanItems : [emptyItem()]);
       toast.success('Serviços salvos');
-    } catch {
-      toast.error('Erro ao salvar. Verifique se seu usuário é admin.');
+    } catch (error) {
+      console.error('Erro ao salvar serviços:', error);
+      toast.error(`Erro ao salvar serviços: ${error.message}`);
     } finally {
       setSaving(false);
     }

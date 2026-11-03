@@ -1,34 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Navbar } from '../components/Navbar/Navbar';
+import { SiteFooter } from '../components/SiteFooter';
 import { Carousel } from '../components/Carousel/Carousel';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Scissors, Sparkles, Calendar, ArrowRight, ShieldCheck, Clock, Award } from 'lucide-react';
-import { getPageContent } from '../services/siteContentService';
+import { usePageContent } from '../hooks/usePageContent';
 
 export const Home = () => {
-  const navigate = useNavigate();
-  const [content, setContent] = useState({
-    hero_badge: "Tradição & Estilo Clássico",
-    hero_title: "Seu estilo começa aqui.",
-    hero_subtitle: "Cortes precisos, barbas impecáveis e a autêntica experiência de barbearia clássica."
-  });
-  const [siteInfo, setSiteInfo] = useState({
-    brand: "Barbershop Corte & Estilo",
-    address: "Rua da Barbearia, 123 - Centro",
-    phone: "(11) 99999-9999",
-    instagram: "@corteestilo",
-    working_hours: "Segunda a Sábado: 09h às 20h",
-    copyright: "© 2026 Barbershop Corte & Estilo. Todos os direitos reservados."
-  });
-
-  useEffect(() => {
-    getPageContent('home').then((data) => {
-      if (data) setContent(data);
-    });
-    getPageContent('site').then((data) => {
-      if (data) setSiteInfo(data);
-    });
-  }, []);
+  const { content } = usePageContent('home');
 
   return (
     <div className="min-h-screen bg-[#0f0a07] text-[#f3e5ab]">
@@ -56,18 +35,18 @@ export const Home = () => {
       >
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#d4af37_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
         
-        <Carousel />
+        <Carousel images={content?.carousel_images} />
         
         <span className="text-sm md:text-base font-semibold tracking-[0.3em] text-[#d4af37] uppercase mb-4" style={{ fontFamily: "'Cinzel Decorative', serif" }}>
-          {content.hero_badge}
+          {content?.hero_badge}
         </span>
         
         <h1 className="text-5xl md:text-7xl font-black mb-6 tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-[#f9e7b2] via-[#d4af37] to-[#9c752b] drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)] max-w-4xl" style={{ fontFamily: "'Cinzel Decorative', 'Pirata One', serif" }}>
-          {content.hero_title}
+          {content?.hero_title}
         </h1>
         
         <p className="text-gray-300 max-w-xl mb-8 text-base md:text-lg">
-          {content.hero_subtitle}
+          {content?.hero_subtitle}
         </p>
         
         <div className="flex flex-col sm:flex-row gap-4 items-center">
@@ -157,21 +136,7 @@ export const Home = () => {
         </div>
       </section>
 
-      {/* Contato / Rodapé */}
-      <footer className="py-16 px-6 bg-[#0a0503] border-t-4 border-[#5a371c] text-center text-gray-400">
-        <div className="container mx-auto max-w-4xl">
-          <span className="text-lg font-bold tracking-widest text-[#d4af37] uppercase block mb-2" style={{ fontFamily: "'Cinzel Decorative', serif" }}>
-            {siteInfo.brand}
-          </span>
-          <p className="mb-2">Endereço: {siteInfo.address}</p>
-          <p className="mb-6">Telefone / WhatsApp: {siteInfo.phone}</p>
-          <div className="flex gap-6 justify-center mb-8 text-sm text-[#f3e5ab]">
-            <span>Instagram: {siteInfo.instagram}</span>
-            <span>{siteInfo.working_hours}</span>
-          </div>
-          <p className="text-xs text-gray-600">{siteInfo.copyright}</p>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 };

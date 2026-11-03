@@ -1,8 +1,65 @@
-import React from 'react';
+import { useState } from 'react';
+import { MapPin, Phone, Clock, MessageCircle, ExternalLink } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { Navbar } from '../components/Navbar/Navbar';
-import { MapPin, Phone, Mail, Clock } from 'lucide-react';
+import { SiteFooter } from '../components/SiteFooter';
+import { usePageContent } from '../hooks/usePageContent';
+import { submitContactMessage } from '../services/contactMessageService';
+
+const initialForm = { nome: '', email: '', mensagem: '' };
+
+const getHttpUrl = (value) => {
+  if (!value) return '';
+
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : '';
+  } catch {
+    return '';
+  }
+};
 
 export const Contato = () => {
+  const { content: contactContent } = usePageContent('contato');
+  const { content: site } = usePageContent('site');
+  const [form, setForm] = useState(initialForm);
+  const [sending, setSending] = useState(false);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setSending(true);
+
+    try {
+      await submitContactMessage({
+        nome: form.nome.trim(),
+        email: form.email.trim(),
+        mensagem: form.mensagem.trim(),
+      });
+
+      toast.success('Mensagem enviada com sucesso!');
+      setForm(initialForm);
+    } catch (error) {
+      console.error('Erro ao enviar mensagem de contato:', error);
+      toast.error(`Não foi possível enviar a mensagem: ${error.message || 'erro inesperado.'}`);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const phoneDigits = site?.phone?.replace(/\D/g, '') || '';
+  const whatsappNumber = phoneDigits.length === 10 || phoneDigits.length === 11
+    ? `55${phoneDigits}`
+    : phoneDigits;
+  const whatsappHref = whatsappNumber
+    ? `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(contactContent?.whatsapp_mensagem || '')}`
+    : null;
+  const mapUrl = getHttpUrl(contactContent?.mapa_embed_url);
+  const parsedMapUrl = mapUrl ? new URL(mapUrl) : null;
+  const isMapEmbed = Boolean(
+    parsedMapUrl &&
+    (/\/maps\/embed(?:\/|$)/i.test(parsedMapUrl.pathname) || parsedMapUrl.searchParams.get('output') === 'embed')
+  );
+
   return (
     <div className="min-h-screen bg-[#0f0a07] text-[#f3e5ab]">
       <Navbar />
@@ -13,100 +70,99 @@ export const Contato = () => {
             Fale Conosco
           </span>
           <h1 className="text-4xl md:text-6xl font-black mb-4 text-transparent bg-clip-text bg-gradient-to-b from-[#f9e7b2] via-[#d4af37] to-[#9c752b] drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)]" style={{ fontFamily: "'Cinzel Decorative', 'Pirata One', serif" }}>
-            Contato & Localização
+            {contactContent?.contato_title}
           </h1>
-          <p className="text-gray-300 max-w-xl mx-auto text-base md:text-lg">
-            Estamos prontos para atendê-lo. Visite nossa barbearia ou entre em contato.
-          </p>
+          <p className="text-gray-300 max-w-xl mx-auto text-base md:text-lg">{contactContent?.contato_subtitle}</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
           <div className="bg-[#1b100b] border-2 border-[#5a371c] rounded-2xl p-8 shadow-2xl flex flex-col justify-between">
             <div>
-              <h3 className="text-2xl font-bold mb-6 text-[#d4af37]" style={{ fontFamily: "'Cinzel Decorative', serif" }}>
+              <h2 className="text-2xl font-bold mb-6 text-[#d4af37]" style={{ fontFamily: "'Cinzel Decorative', serif" }}>
                 Informações
-              </h3>
+              </h2>
               <ul className="space-y-6 text-gray-300">
-                <li className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-[#2b170e] border border-[#d4af37]/40 flex items-center justify-center text-[#d4af37] flex-shrink-0">
-                    <MapPin className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <strong className="block text-[#f3e5ab] mb-0.5">Endereço</strong>
-                    <span className="text-sm text-gray-400">Rua da Barbearia, 123 - Centro, São Paulo - SP</span>
-                  </div>
-                </li>
-
-                <li className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-[#2b170e] border border-[#d4af37]/40 flex items-center justify-center text-[#d4af37] flex-shrink-0">
-                    <Phone className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <strong className="block text-[#f3e5ab] mb-0.5">Telefone / WhatsApp</strong>
-                    <span className="text-sm text-gray-400">(11) 99999-9999</span>
-                  </div>
-                </li>
-
-                <li className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-[#2b170e] border border-[#d4af37]/40 flex items-center justify-center text-[#d4af37] flex-shrink-0">
-                    <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
-                      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <strong className="block text-[#f3e5ab] mb-0.5">Instagram</strong>
-                    <span className="text-sm text-gray-400">@corteestilo</span>
-                  </div>
-                </li>
-
-                <li className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-[#2b170e] border border-[#d4af37]/40 flex items-center justify-center text-[#d4af37] flex-shrink-0">
-                    <Clock className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <strong className="block text-[#f3e5ab] mb-0.5">Horário de Funcionamento</strong>
-                    <span className="text-sm text-gray-400">Segunda a Sábado: 09h às 20h</span>
-                  </div>
-                </li>
+                {site?.address && (
+                  <li className="flex items-start gap-4">
+                    <MapPin className="w-5 h-5 mt-1 text-[#d4af37] flex-shrink-0" />
+                    <div><strong className="block text-[#f3e5ab] mb-0.5">Endereço</strong><span className="text-sm text-gray-400">{site.address}</span></div>
+                  </li>
+                )}
+                {site?.phone && (
+                  <li className="flex items-start gap-4">
+                    <Phone className="w-5 h-5 mt-1 text-[#d4af37] flex-shrink-0" />
+                    <div>
+                      <strong className="block text-[#f3e5ab] mb-0.5">Telefone / WhatsApp</strong>
+                      {whatsappHref
+                        ? <a href={whatsappHref} target="_blank" rel="noreferrer" className="text-sm text-gray-400 hover:text-[#d4af37]">{site.phone}</a>
+                        : <span className="text-sm text-gray-400">{site.phone}</span>}
+                    </div>
+                  </li>
+                )}
+                {site?.instagram && (
+                  <li className="flex items-start gap-4">
+                    <span className="text-[#d4af37] font-semibold">@</span>
+                    <div><strong className="block text-[#f3e5ab] mb-0.5">Instagram</strong><span className="text-sm text-gray-400">{site.instagram}</span></div>
+                  </li>
+                )}
+                {site?.working_hours && (
+                  <li className="flex items-start gap-4">
+                    <Clock className="w-5 h-5 mt-1 text-[#d4af37] flex-shrink-0" />
+                    <div><strong className="block text-[#f3e5ab] mb-0.5">Horário de Funcionamento</strong><span className="text-sm text-gray-400">{site.working_hours}</span></div>
+                  </li>
+                )}
               </ul>
+              {whatsappHref && (
+                <a href={whatsappHref} target="_blank" rel="noreferrer"
+                  className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-[#1fb957]">
+                  <MessageCircle className="h-5 w-5" />
+                  Falar pelo WhatsApp
+                </a>
+              )}
+              {mapUrl && isMapEmbed && (
+                <iframe
+                  title="Localização da barbearia"
+                  src={mapUrl}
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  className="w-full h-48 mt-6 rounded-xl border border-[#5a371c]"
+                />
+              )}
+              {mapUrl && (
+                <a href={mapUrl} target="_blank" rel="noreferrer"
+                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#d4af37] px-4 py-3 text-sm font-bold text-[#d4af37] transition-colors hover:bg-[#d4af37] hover:text-[#1a0f08]">
+                  <ExternalLink className="h-4 w-4" />
+                  Abrir localização no Google Maps
+                </a>
+              )}
             </div>
           </div>
 
-          <div className="bg-[#1b100b] border-2 border-[#5a371c] rounded-2xl p-8 shadow-2xl flex flex-col justify-between">
-            <div>
-              <h3 className="text-2xl font-bold mb-6 text-[#d4af37]" style={{ fontFamily: "'Cinzel Decorative', serif" }}>
-                Envie uma Mensagem
-              </h3>
-              <form onSubmit={(e) => { e.preventDefault(); alert('Mensagem enviada com sucesso!'); }} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-[#d4af37] mb-1">Seu Nome</label>
-                  <input type="text" required placeholder="Digite seu nome" className="w-full px-4 py-2.5 rounded-xl bg-[#120a06] border border-[#5a371c] text-[#f3e5ab] focus:border-[#d4af37] outline-none text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-[#d4af37] mb-1">Seu E-mail / WhatsApp</label>
-                  <input type="text" required placeholder="Digite seu contato" className="w-full px-4 py-2.5 rounded-xl bg-[#120a06] border border-[#5a371c] text-[#f3e5ab] focus:border-[#d4af37] outline-none text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-[#d4af37] mb-1">Mensagem</label>
-                  <textarea rows="4" required placeholder="Escreva sua dúvida ou sugestão" className="w-full px-4 py-2.5 rounded-xl bg-[#120a06] border border-[#5a371c] text-[#f3e5ab] focus:border-[#d4af37] outline-none text-sm resize-none"></textarea>
-                </div>
-                <button type="submit" className="w-full py-3 rounded-xl bg-gradient-to-b from-[#f5d78e] via-[#d4af37] to-[#9c752b] text-[#1a0f08] font-black uppercase tracking-wider text-xs border border-[#5a371c] shadow-md hover:opacity-90 transition-all">
-                  Enviar Mensagem
-                </button>
-              </form>
-            </div>
+          <div className="bg-[#1b100b] border-2 border-[#5a371c] rounded-2xl p-8 shadow-2xl">
+            <h2 className="text-2xl font-bold mb-6 text-[#d4af37]" style={{ fontFamily: "'Cinzel Decorative', serif" }}>
+              Envie uma Mensagem
+            </h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="contact-name" className="block text-xs font-bold uppercase tracking-wider text-[#d4af37] mb-1">Seu Nome</label>
+                <input id="contact-name" type="text" value={form.nome} onChange={(event) => setForm({ ...form, nome: event.target.value })} required maxLength={120} placeholder="Digite seu nome" className="w-full px-4 py-2.5 rounded-xl bg-[#120a06] border border-[#5a371c] text-[#f3e5ab] focus:border-[#d4af37] outline-none text-sm" />
+              </div>
+              <div>
+                <label htmlFor="contact-email" className="block text-xs font-bold uppercase tracking-wider text-[#d4af37] mb-1">Seu E-mail</label>
+                <input id="contact-email" type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} required maxLength={320} placeholder="Digite seu e-mail" className="w-full px-4 py-2.5 rounded-xl bg-[#120a06] border border-[#5a371c] text-[#f3e5ab] focus:border-[#d4af37] outline-none text-sm" />
+              </div>
+              <div>
+                <label htmlFor="contact-message" className="block text-xs font-bold uppercase tracking-wider text-[#d4af37] mb-1">Mensagem</label>
+                <textarea id="contact-message" value={form.mensagem} onChange={(event) => setForm({ ...form, mensagem: event.target.value })} rows="4" required maxLength={5000} placeholder="Escreva sua dúvida ou sugestão" className="w-full px-4 py-2.5 rounded-xl bg-[#120a06] border border-[#5a371c] text-[#f3e5ab] focus:border-[#d4af37] outline-none text-sm resize-none" />
+              </div>
+              <button type="submit" disabled={sending} className="w-full py-3 rounded-xl bg-gradient-to-b from-[#f5d78e] via-[#d4af37] to-[#9c752b] text-[#1a0f08] font-black uppercase tracking-wider text-xs border border-[#5a371c] shadow-md hover:opacity-90 transition-all disabled:opacity-50">
+                {sending ? 'Enviando...' : 'Enviar Mensagem'}
+              </button>
+            </form>
           </div>
         </div>
       </main>
-
-      <footer className="py-12 px-6 bg-[#0a0503] border-t-4 border-[#5a371c] text-center text-gray-400">
-        <div className="container mx-auto max-w-4xl">
-          <span className="text-base font-bold tracking-widest text-[#d4af37] uppercase block mb-2" style={{ fontFamily: "'Cinzel Decorative', serif" }}>
-            Barbershop Corte & Estilo
-          </span>
-          <p className="text-xs text-gray-600">© 2026 Barbershop Corte & Estilo. Todos os direitos reservados.</p>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 };

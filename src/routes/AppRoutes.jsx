@@ -24,6 +24,8 @@ import { AdminPrecos } from '../pages/admin/AdminPrecos';
 import { AdminEquipe } from '../pages/admin/AdminEquipe';
 import { AdminGaleria } from '../pages/admin/AdminGaleria';
 import { AdminContato } from '../pages/admin/AdminContato';
+import { AdminAgendamentos } from '../pages/admin/AdminAgendamentos';
+import { AdminMensagens } from '../pages/admin/AdminMensagens';
 
 export const AppRoutes = () => {
   return (
@@ -35,18 +37,18 @@ export const AppRoutes = () => {
         <Route path="/login" element={<Login />} />
         <Route path="/cadastro" element={<SignUp />} />
         <Route path="/recuperar-senha" element={<ForgotPassword />} />
+        <Route path="/agendamento" element={<Agendamento />} />
+        <Route path="/servicos" element={<Servicos />} />
+        <Route path="/precos" element={<Precos />} />
+        <Route path="/galeria" element={<Galeria />} />
+        <Route path="/sobre" element={<Sobre />} />
+        <Route path="/equipe" element={<Equipe />} />
+        <Route path="/contato" element={<Contato />} />
 
         {/* Rotas Protegidas — exige login */}
         <Route element={<PrivateRoute />}>
           <Route path="/profile" element={<Profile />} />
-          <Route path="/agendamento" element={<Agendamento />} />
           <Route path="/barber" element={<BarberDashboard />} />
-          <Route path="/servicos" element={<Servicos />} />
-          <Route path="/precos" element={<Precos />} />
-          <Route path="/galeria" element={<Galeria />} />
-          <Route path="/sobre" element={<Sobre />} />
-          <Route path="/equipe" element={<Equipe />} />
-          <Route path="/contato" element={<Contato />} />
         </Route>
 
         {/* Painel de administração — só usuário com role admin */}
@@ -60,6 +62,8 @@ export const AppRoutes = () => {
             <Route path="equipe" element={<AdminEquipe />} />
             <Route path="galeria" element={<AdminGaleria />} />
             <Route path="contato" element={<AdminContato />} />
+            <Route path="agendamentos" element={<AdminAgendamentos />} />
+            <Route path="mensagens" element={<AdminMensagens />} />
           </Route>
         </Route>
 

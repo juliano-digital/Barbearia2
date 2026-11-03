@@ -13,17 +13,24 @@ export const AdminEquipe = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingId, setUploadingId] = useState(null);
+  const [pendingDeletes, setPendingDeletes] = useState([]);
 
   useEffect(() => {
     const load = async () => {
-      const data = await getPageContent('equipe');
-      if (data) {
-        setIntro({ equipe_title: data.equipe_title || '', equipe_subtitle: data.equipe_subtitle || '' });
-        setMembers(Array.isArray(data.members) && data.members.length ? data.members : [emptyMember()]);
-      } else {
-        setMembers([emptyMember()]);
+      try {
+        const data = await getPageContent('equipe');
+        if (data) {
+          setIntro({ equipe_title: data.equipe_title || '', equipe_subtitle: data.equipe_subtitle || '' });
+          setMembers(Array.isArray(data.members) && data.members.length ? data.members : [emptyMember()]);
+        } else {
+          setMembers([emptyMember()]);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar equipe:', error);
+        toast.error(`Erro ao carregar conteúdo: ${error.message}`);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     load();
   }, []);
@@ -33,7 +40,11 @@ export const AdminEquipe = () => {
   };
 
   const addMember = () => setMembers((prev) => [...prev, emptyMember()]);
-  const removeMember = (id) => setMembers((prev) => prev.filter((m) => m.id !== id));
+  const removeMember = (id) => {
+    const member = members.find((item) => item.id === id);
+    if (member?.foto) setPendingDeletes((prev) => [...new Set([...prev, member.foto])]);
+    setMembers((prev) => prev.filter((item) => item.id !== id));
+  };
 
   const handlePhotoChange = async (id, e) => {
     const file = e.target.files?.[0];
@@ -43,9 +54,10 @@ export const AdminEquipe = () => {
       const member = members.find((m) => m.id === id);
       const url = await uploadImage(file, 'equipe');
       updateMember(id, 'foto', url);
-      if (member?.foto) await deleteImage(member.foto);
-    } catch {
-      toast.error('Erro ao enviar foto');
+      if (member?.foto) setPendingDeletes((prev) => [...new Set([...prev, member.foto])]);
+    } catch (error) {
+      console.error('Erro ao enviar foto da equipe:', error);
+      toast.error(`Erro ao enviar foto: ${error.message}`);
     } finally {
       setUploadingId(null);
     }
@@ -57,9 +69,20 @@ export const AdminEquipe = () => {
       const cleanMembers = members.filter((m) => m.nome.trim() !== '');
       await savePageContent('equipe', { ...intro, members: cleanMembers });
       setMembers(cleanMembers.length ? cleanMembers : [emptyMember()]);
+    } catch (error) {
+      console.error('Erro ao salvar equipe:', error);
+      toast.error(`Erro ao salvar equipe: ${error.message}`);
+      setSaving(false);
+      return;
+    }
+
+    try {
+      await Promise.all(pendingDeletes.map(deleteImage));
+      setPendingDeletes([]);
       toast.success('Equipe salva');
-    } catch {
-      toast.error('Erro ao salvar. Verifique se seu usuário é admin.');
+    } catch (error) {
+      console.error('Equipe salva, mas uma foto antiga não foi removida:', error);
+      toast.error(`Equipe salva, mas não foi possível limpar uma foto antiga: ${error.message}`);
     } finally {
       setSaving(false);
     }

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Home as HomeIcon, Info, Scissors, DollarSign, Users, Image, Phone } from 'lucide-react';
+import { Home as HomeIcon, Info, Scissors, DollarSign, Users, Image, Phone, CalendarDays, Mail } from 'lucide-react';
 
 const sections = [
   { to: '/admin/home', label: 'Home', icon: HomeIcon, desc: 'Textos do topo e rodapé' },
@@ -9,6 +9,8 @@ const sections = [
   { to: '/admin/equipe', label: 'Equipe', icon: Users, desc: 'Barbeiros e especialidades' },
   { to: '/admin/galeria', label: 'Galeria', icon: Image, desc: 'Fotos do ambiente e cortes' },
   { to: '/admin/contato', label: 'Contato', icon: Phone, desc: 'Endereço, telefone e horários' },
+  { to: '/admin/agendamentos', label: 'Agendamentos', icon: CalendarDays, desc: 'Solicitações recebidas pelo site' },
+  { to: '/admin/mensagens', label: 'Mensagens', icon: Mail, desc: 'Mensagens recebidas pelo formulário' },
 ];
 
 export const AdminDashboard = () => (

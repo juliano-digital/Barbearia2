@@ -14,14 +14,20 @@ export const AdminPrecos = () => {
 
   useEffect(() => {
     const load = async () => {
-      const data = await getPageContent('precos');
-      if (data) {
-        setIntro({ precos_title: data.precos_title || '', precos_subtitle: data.precos_subtitle || '' });
-        setPlans(Array.isArray(data.plans) && data.plans.length ? data.plans : [emptyPlan()]);
-      } else {
-        setPlans([emptyPlan()]);
+      try {
+        const data = await getPageContent('precos');
+        if (data) {
+          setIntro({ precos_title: data.precos_title || '', precos_subtitle: data.precos_subtitle || '' });
+          setPlans(Array.isArray(data.plans) && data.plans.length ? data.plans : [emptyPlan()]);
+        } else {
+          setPlans([emptyPlan()]);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar preços:', error);
+        toast.error(`Erro ao carregar conteúdo: ${error.message}`);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     load();
   }, []);
@@ -40,8 +46,9 @@ export const AdminPrecos = () => {
       await savePageContent('precos', { ...intro, plans: cleanPlans });
       setPlans(cleanPlans.length ? cleanPlans : [emptyPlan()]);
       toast.success('Preços salvos');
-    } catch {
-      toast.error('Erro ao salvar. Verifique se seu usuário é admin.');
+    } catch (error) {
+      console.error('Erro ao salvar preços:', error);
+      toast.error(`Erro ao salvar preços: ${error.message}`);
     } finally {
       setSaving(false);
     }

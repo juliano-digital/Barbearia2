@@ -7,67 +7,28 @@ CREATE TABLE IF NOT EXISTS public.users (
   email TEXT NOT NULL,
   telefone TEXT,
   avatar TEXT,
+  role TEXT NOT NULL DEFAULT 'user',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Tabela de Barbeiros (barbers)
-CREATE TABLE IF NOT EXISTS public.barbers (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  nome TEXT NOT NULL,
-  foto TEXT,
-  especialidade TEXT,
-  ativo BOOLEAN DEFAULT true,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- Tipo de status para agendamentos
-CREATE TYPE appointment_status AS ENUM ('Agendado', 'Concluído', 'Cancelado');
-
--- Tabela de Serviços (services)
-CREATE TABLE IF NOT EXISTS public.services (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  nome TEXT NOT NULL,
-  descricao TEXT,
-  valor DECIMAL(10, 2) NOT NULL,
-  duracao INTEGER NOT NULL,
-  ativo BOOLEAN DEFAULT true
-);
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS role TEXT;
+UPDATE public.users SET role = 'user' WHERE role IS NULL;
+ALTER TABLE public.users
+  ALTER COLUMN role SET DEFAULT 'user',
+  ALTER COLUMN role SET NOT NULL;
 
 -- Tabela de Agendamentos (appointments)
 CREATE TABLE IF NOT EXISTS public.appointments (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  cliente_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
-  barber_id UUID REFERENCES public.barbers(id) ON DELETE CASCADE NOT NULL,
-  service_id UUID REFERENCES public.services(id) ON DELETE CASCADE NOT NULL,
+  nome TEXT NOT NULL CONSTRAINT appointments_nome_not_blank CHECK (BTRIM(nome) <> ''),
+  telefone TEXT NOT NULL CONSTRAINT appointments_telefone_not_blank CHECK (BTRIM(telefone) <> ''),
+  servico TEXT NOT NULL CONSTRAINT appointments_servico_not_blank CHECK (BTRIM(servico) <> ''),
   data DATE NOT NULL,
-  hora TIME NOT NULL,
-  status appointment_status DEFAULT 'Agendado' NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+  horario TIME NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
--- Tabela de horários bloqueados (blocked_times)
-CREATE TABLE IF NOT EXISTS public.blocked_times (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  barber_id UUID REFERENCES public.barbers(id) ON DELETE CASCADE NOT NULL,
-  data DATE NOT NULL,
-  hora TIME NOT NULL,
-  motivo TEXT
-);
-
--- Tabela de horários de funcionamento (working_hours)
-CREATE TABLE IF NOT EXISTS public.working_hours (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  dia_semana INTEGER NOT NULL, -- 0-6 (domingo-sábado)
-  hora_inicio TIME NOT NULL,
-  hora_fim TIME NOT NULL
-);
-
--- Tabela de feriados (holidays)
-CREATE TABLE IF NOT EXISTS public.holidays (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  data DATE NOT NULL,
-  descricao TEXT
-);
+CREATE INDEX IF NOT EXISTS appointments_date_time_idx
+  ON public.appointments (data, horario);
 
 -- Tabela de conteúdo editável do site (usada pelo painel /admin)
 create table if not exists site_content (
@@ -79,46 +40,140 @@ create table if not exists site_content (
 
 alter table site_content enable row level security;
 
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.users AS profile
+    WHERE profile.id = auth.uid()
+      AND profile.role::TEXT = 'admin'
+  );
+$$;
+
+REVOKE ALL ON FUNCTION public.is_admin() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated;
+
 -- Qualquer visitante pode LER o conteúdo (site público)
+DROP POLICY IF EXISTS "Public can read site content" ON site_content;
+DROP POLICY IF EXISTS "Authenticated users can insert site content" ON site_content;
+DROP POLICY IF EXISTS "Authenticated users can update site content" ON site_content;
+DROP POLICY IF EXISTS "Admins can insert site content" ON site_content;
+DROP POLICY IF EXISTS "Admins can update site content" ON site_content;
 create policy "Public can read site content"
   on site_content for select
   using (true);
 
--- Só usuário logado pode criar/editar conteúdo (painel admin)
-create policy "Authenticated users can insert site content"
+CREATE POLICY "Admins can insert site content"
   on site_content for insert
   to authenticated
-  with check (true);
+  with check (public.is_admin());
 
-create policy "Authenticated users can update site content"
+CREATE POLICY "Admins can update site content"
   on site_content for update
   to authenticated
-  using (true)
-  with check (true);
-
--- Dados iniciais (não sobrescreve se já existir)
-insert into site_content (page, content) values
-  ('home', '{
-    "hero_badge": "Tradição & Estilo Clássico",
-    "hero_title": "Seu estilo começa aqui.",
-    "hero_subtitle": "Cortes precisos, barbas impecáveis e a autêntica experiência de barbearia clássica."
-  }'::jsonb),
-  ('site', '{
-    "brand": "Barbershop Corte & Estilo",
-    "address": "Rua da Barbearia, 123 - Centro",
-    "phone": "(11) 99999-9999",
-    "instagram": "@corteestilo",
-    "working_hours": "Segunda a Sábado: 09h às 20h",
-    "copyright": "© 2026 Barbershop Corte & Estilo. Todos os direitos reservados."
-  }'::jsonb)
-on conflict (page) do nothing;
+  using (public.is_admin())
+  with check (public.is_admin());
+REVOKE ALL ON TABLE public.site_content FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON TABLE public.site_content TO anon, authenticated;
+GRANT INSERT, UPDATE ON TABLE public.site_content TO authenticated;
 
 -- Habilitação de RLS
-ALTER TABLE public.working_hours ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.holidays ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.barbers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.services ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.appointments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.blocked_times ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can read own profile or admins can read profiles" ON public.users;
+DROP POLICY IF EXISTS "Users can create own profile" ON public.users;
+CREATE POLICY "Users can read own profile or admins can read profiles"
+  ON public.users FOR SELECT TO authenticated
+  USING (id = auth.uid() OR public.is_admin());
+CREATE POLICY "Users can create own profile"
+  ON public.users FOR INSERT TO authenticated
+  WITH CHECK (id = auth.uid() AND role = 'user');
+REVOKE ALL ON TABLE public.users FROM PUBLIC, anon, authenticated;
+GRANT SELECT, INSERT ON TABLE public.users TO authenticated;
+
+-- Visitantes podem somente inserir agendamentos; não podem consultar ou alterá-los.
+DROP POLICY IF EXISTS "Public can insert appointments" ON public.appointments;
+DROP POLICY IF EXISTS "Admins can read appointments" ON public.appointments;
+CREATE POLICY "Public can insert appointments"
+  ON public.appointments
+  FOR INSERT
+  TO anon, authenticated
+  WITH CHECK (
+    BTRIM(nome) <> ''
+    AND BTRIM(telefone) <> ''
+    AND BTRIM(servico) <> ''
+  );
+CREATE POLICY "Admins can read appointments"
+  ON public.appointments
+  FOR SELECT
+  TO authenticated
+  USING (public.is_admin());
+CREATE POLICY "Admins can delete appointments"
+  ON public.appointments
+  FOR DELETE
+  TO authenticated
+  USING (public.is_admin());
+REVOKE ALL ON TABLE public.appointments FROM PUBLIC, anon, authenticated;
+GRANT INSERT ON TABLE public.appointments TO anon, authenticated;
+GRANT SELECT, DELETE ON TABLE public.appointments TO authenticated;
+
+CREATE TABLE IF NOT EXISTS public.contact_messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nome TEXT NOT NULL CHECK (BTRIM(nome) <> ''),
+  email TEXT NOT NULL CHECK (BTRIM(email) <> ''),
+  mensagem TEXT NOT NULL CHECK (BTRIM(mensagem) <> ''),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS contact_messages_created_at_idx
+  ON public.contact_messages (created_at DESC);
+
+ALTER TABLE public.contact_messages ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.contact_messages FROM PUBLIC, anon, authenticated;
+GRANT INSERT ON TABLE public.contact_messages TO anon, authenticated;
+GRANT SELECT, DELETE ON TABLE public.contact_messages TO authenticated;
+
+DROP POLICY IF EXISTS "Public can submit contact messages" ON public.contact_messages;
+DROP POLICY IF EXISTS "Admins can read contact messages" ON public.contact_messages;
+DROP POLICY IF EXISTS "Admins can delete contact messages" ON public.contact_messages;
+CREATE POLICY "Public can submit contact messages"
+  ON public.contact_messages FOR INSERT TO anon, authenticated
+  WITH CHECK (
+    BTRIM(nome) <> ''
+    AND BTRIM(email) <> ''
+    AND BTRIM(mensagem) <> ''
+  );
+CREATE POLICY "Admins can read contact messages"
+  ON public.contact_messages FOR SELECT TO authenticated
+  USING (public.is_admin());
+CREATE POLICY "Admins can delete contact messages"
+  ON public.contact_messages FOR DELETE TO authenticated
+  USING (public.is_admin());
+
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('site-images', 'site-images', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public can view site images" ON storage.objects;
+DROP POLICY IF EXISTS "Admins can upload site images" ON storage.objects;
+DROP POLICY IF EXISTS "Admins can update site images" ON storage.objects;
+DROP POLICY IF EXISTS "Admins can delete site images" ON storage.objects;
+CREATE POLICY "Public can view site images"
+  ON storage.objects FOR SELECT TO public
+  USING (bucket_id = 'site-images');
+CREATE POLICY "Admins can upload site images"
+  ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'site-images' AND public.is_admin());
+CREATE POLICY "Admins can update site images"
+  ON storage.objects FOR UPDATE TO authenticated
+  USING (bucket_id = 'site-images' AND public.is_admin())
+  WITH CHECK (bucket_id = 'site-images' AND public.is_admin());
+CREATE POLICY "Admins can delete site images"
+  ON storage.objects FOR DELETE TO authenticated
+  USING (bucket_id = 'site-images' AND public.is_admin());

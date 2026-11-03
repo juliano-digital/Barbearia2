@@ -10,12 +10,19 @@ export const AdminGaleria = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [pendingDeletes, setPendingDeletes] = useState([]);
 
   useEffect(() => {
     const load = async () => {
-      const data = await getPageContent('galeria');
-      if (data && Array.isArray(data.photos)) setPhotos(data.photos);
-      setLoading(false);
+      try {
+        const data = await getPageContent('galeria');
+        if (data && Array.isArray(data.photos)) setPhotos(data.photos);
+      } catch (error) {
+        console.error('Erro ao carregar galeria:', error);
+        toast.error(`Erro ao carregar conteúdo: ${error.message}`);
+      } finally {
+        setLoading(false);
+      }
     };
     load();
   }, []);
@@ -32,8 +39,9 @@ export const AdminGaleria = () => {
       }
       setPhotos((prev) => [...prev, ...uploaded]);
       toast.success(`${uploaded.length} foto(s) enviada(s)`);
-    } catch {
-      toast.error('Erro ao enviar fotos');
+    } catch (error) {
+      console.error('Erro ao enviar fotos da galeria:', error);
+      toast.error(`Erro ao enviar fotos: ${error.message}`);
     } finally {
       setUploading(false);
       e.target.value = '';
@@ -46,17 +54,28 @@ export const AdminGaleria = () => {
 
   const removePhoto = async (id) => {
     const photo = photos.find((p) => p.id === id);
+    if (photo?.url) setPendingDeletes((prev) => [...new Set([...prev, photo.url])]);
     setPhotos((prev) => prev.filter((p) => p.id !== id));
-    if (photo?.url) await deleteImage(photo.url);
   };
 
   const handleSave = async () => {
     setSaving(true);
     try {
       await savePageContent('galeria', { photos });
+    } catch (error) {
+      console.error('Erro ao salvar galeria:', error);
+      toast.error(`Erro ao salvar galeria: ${error.message}`);
+      setSaving(false);
+      return;
+    }
+
+    try {
+      await Promise.all(pendingDeletes.map(deleteImage));
+      setPendingDeletes([]);
       toast.success('Galeria salva');
-    } catch {
-      toast.error('Erro ao salvar. Verifique se seu usuário é admin.');
+    } catch (error) {
+      console.error('Galeria salva, mas uma foto removida não foi excluída do armazenamento:', error);
+      toast.error(`Galeria salva, mas não foi possível limpar uma foto antiga: ${error.message}`);
     } finally {
       setSaving(false);
     }

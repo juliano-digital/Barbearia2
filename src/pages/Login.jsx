@@ -1,28 +1,56 @@
 import { useForm } from 'react-hook-form';
-import { supabase } from '../services/supabaseClient';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { DEMO_CREDENTIALS, clearDemoAccess, enableDemoAccess } from '../lib/demoAccess';
+import { supabase } from '../services/supabaseClient';
 
 export const Login = () => {
-  const { register, handleSubmit } = useForm();
+  const { register, handleSubmit } = useForm({ defaultValues: DEMO_CREDENTIALS });
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [adminCredentials, setAdminCredentials] = useState({ email: '', password: '' });
 
-  const onSubmit = async (data) => {
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
-      email: data.email,
-      password: data.password,
-    });
-    setLoading(false);
+  const onSubmit = () => {
+    setDemoLoading(true);
+    enableDemoAccess();
+    toast.success('Acesso demonstrativo iniciado!');
+    navigate('/');
+  };
 
-    if (error) {
-      toast.error(error.message);
-    } else {
-      toast.success('Login realizado com sucesso!');
+  const handleAdminLogin = async (event) => {
+    event.preventDefault();
+    setAdminLoading(true);
+
+    try {
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email: adminCredentials.email.trim(),
+        password: adminCredentials.password,
+      });
+      if (authError) throw authError;
+
+      const { data: userRow, error: profileError } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', data.user.id)
+        .single();
+
+      if (profileError || userRow?.role !== 'admin') {
+        const { error: signOutError } = await supabase.auth.signOut();
+        if (signOutError) throw signOutError;
+        if (profileError) throw profileError;
+        throw new Error('Esta conta não possui acesso administrativo.');
+      }
+
+      clearDemoAccess();
+      toast.success('Login administrativo realizado!');
       navigate('/');
+    } catch (error) {
+      console.error('Erro ao entrar no painel administrativo:', error);
+      toast.error(`Não foi possível entrar: ${error.message || 'erro inesperado.'}`);
+    } finally {
+      setAdminLoading(false);
     }
   };
 
@@ -45,14 +73,14 @@ export const Login = () => {
         </div>
         
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <h3 className="text-sm font-semibold text-amber-400">Acesso demonstrativo</h3>
           <div className="relative">
             <label className="block mb-1 text-sm font-medium text-neutral-300">E-mail</label>
             <input 
               {...register('email')} 
               type="email"
-              placeholder="seu@email.com" 
+              readOnly
               className="w-full p-3 bg-[#222]/40 border border-neutral-700 rounded-lg text-sm text-white placeholder-neutral-400 focus:outline-none focus:border-amber-500 transition" 
-              required 
             />
           </div>
 
@@ -61,31 +89,54 @@ export const Login = () => {
             <input 
               {...register('password')} 
               type="password" 
-              placeholder="Sua senha" 
+              readOnly
               className="w-full p-3 bg-[#222]/40 border border-neutral-700 rounded-lg text-sm text-white placeholder-neutral-400 focus:outline-none focus:border-amber-500 transition" 
-              required 
             />
-          </div>
-
-          <div className="flex items-center justify-between text-sm">
-            <Link to="/recuperar-senha" className="text-neutral-400 hover:text-amber-400 transition">Esqueceu a senha?</Link>
           </div>
 
           <button 
             type="submit" 
-            disabled={loading}
+          disabled={demoLoading}
             className="w-full py-3 text-white bg-gradient-to-r from-amber-600 to-amber-700 rounded-lg hover:from-amber-500 hover:to-amber-600 transition duration-200 font-bold uppercase tracking-wider text-sm shadow-lg disabled:opacity-50 cursor-pointer"
           >
-            {loading ? 'Entrando...' : 'Entrar'}
+          {demoLoading ? 'Entrando...' : 'Acessar demonstração'}
           </button>
         </form>
 
-        <p className="mt-6 text-sm text-center text-neutral-400">
-          Não tem uma conta?{' '}
-          <Link to="/cadastro" className="text-amber-400 font-medium hover:underline">
-            Cadastre-se
-          </Link>
-        </p>
+        <form onSubmit={handleAdminLogin} className="space-y-4 border-t border-white/10 mt-6 pt-6">
+          <h3 className="text-sm font-semibold text-neutral-200">Login administrativo</h3>
+          <div>
+          <label htmlFor="admin-email" className="block mb-1 text-sm font-medium text-neutral-300">E-mail</label>
+          <input
+            id="admin-email"
+            type="email"
+            autoComplete="username"
+            required
+            value={adminCredentials.email}
+            onChange={(event) => setAdminCredentials((current) => ({ ...current, email: event.target.value }))}
+            className="w-full p-3 bg-[#222]/40 border border-neutral-700 rounded-lg text-sm text-white placeholder-neutral-400 focus:outline-none focus:border-amber-500 transition"
+          />
+          </div>
+          <div>
+          <label htmlFor="admin-password" className="block mb-1 text-sm font-medium text-neutral-300">Senha</label>
+          <input
+            id="admin-password"
+            type="password"
+            autoComplete="current-password"
+            required
+            value={adminCredentials.password}
+            onChange={(event) => setAdminCredentials((current) => ({ ...current, password: event.target.value }))}
+            className="w-full p-3 bg-[#222]/40 border border-neutral-700 rounded-lg text-sm text-white placeholder-neutral-400 focus:outline-none focus:border-amber-500 transition"
+          />
+          </div>
+          <button
+          type="submit"
+          disabled={adminLoading}
+          className="w-full py-3 text-white bg-neutral-700 rounded-lg hover:bg-neutral-600 transition duration-200 font-bold uppercase tracking-wider text-sm shadow-lg disabled:opacity-50"
+          >
+          {adminLoading ? 'Verificando...' : 'Entrar como administrador'}
+          </button>
+        </form>
       </div>
     </div>
   );

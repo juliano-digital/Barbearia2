@@ -12,9 +12,15 @@ export const AdminContato = () => {
 
   useEffect(() => {
     const load = async () => {
-      const data = await getPageContent('contato');
-      if (data) setContato((prev) => ({ ...prev, ...data }));
-      setLoading(false);
+      try {
+        const data = await getPageContent('contato');
+        if (data) setContato((prev) => ({ ...prev, ...data }));
+      } catch (error) {
+        console.error('Erro ao carregar conteúdo de contato:', error);
+        toast.error(`Erro ao carregar conteúdo: ${error.message}`);
+      } finally {
+        setLoading(false);
+      }
     };
     load();
   }, []);
@@ -24,8 +30,9 @@ export const AdminContato = () => {
     try {
       await savePageContent('contato', contato);
       toast.success('Conteúdo da página Contato salvo');
-    } catch {
-      toast.error('Erro ao salvar. Verifique se seu usuário é admin.');
+    } catch (error) {
+      console.error('Erro ao salvar conteúdo de contato:', error);
+      toast.error(`Erro ao salvar conteúdo: ${error.message}`);
     } finally {
       setSaving(false);
     }
@@ -60,14 +67,16 @@ export const AdminContato = () => {
             className="w-full border border-black rounded-md px-3 py-2 text-sm resize-none" />
         </div>
         <div>
-          <label className="block text-xs mb-1.5">URL do mapa incorporado (Google Maps embed)</label>
-          <input type="text" value={contato.mapa_embed_url} onChange={(e) => setContato({ ...contato, mapa_embed_url: e.target.value })}
-            className="w-full border border-black rounded-md px-3 py-2 text-sm" placeholder="https://www.google.com/maps/embed?..." />
+          <label className="block text-xs mb-1.5">URL de destino do Google Maps</label>
+          <input type="url" value={contato.mapa_embed_url} onChange={(e) => setContato({ ...contato, mapa_embed_url: e.target.value })}
+            className="w-full border border-black rounded-md px-3 py-2 text-sm" placeholder="Cole o link de compartilhamento ou de incorporação do Maps" />
+          <p className="mt-1 text-xs text-gray-500">Links de incorporação mostram o mapa aqui; links compartilhados abrem a localização no Google Maps.</p>
         </div>
         <div>
           <label className="block text-xs mb-1.5">Mensagem padrão do botão WhatsApp</label>
           <input type="text" value={contato.whatsapp_mensagem} onChange={(e) => setContato({ ...contato, whatsapp_mensagem: e.target.value })}
             className="w-full border border-black rounded-md px-3 py-2 text-sm" placeholder="Olá! Gostaria de agendar um horário." />
+          <p className="mt-1 text-xs text-gray-500">O botão usa o telefone cadastrado em Admin → Home → Informações do site.</p>
         </div>
 
         <div className="flex justify-end">

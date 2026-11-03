@@ -1,23 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { DEFAULT_CAROUSEL_IMAGES } from '../../lib/carouselImages';
 import './Carousel.css';
 
-export const Carousel = () => {
-  const images = [
-    '/Img/carrossel/1.png',
-    '/Img/carrossel/2.png',
-    '/Img/carrossel/3.png',
-    '/Img/carrossel/4.png'
-  ];
-
+export const Carousel = ({ images: configuredImages }) => {
+  const images = Array.isArray(configuredImages) ? configuredImages : DEFAULT_CAROUSEL_IMAGES;
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
+    setCurrentIndex(0);
+  }, [images.length]);
+
+  useEffect(() => {
+    if (images.length < 2) return undefined;
     const timer = setInterval(() => {
       setCurrentIndex((prevIndex) => (prevIndex + 1) % images.length);
     }, 4000);
     return () => clearInterval(timer);
   }, [images.length]);
+
+  if (images.length === 0) return null;
 
   const handlePrev = () => {
     setCurrentIndex((prevIndex) => (prevIndex - 1 + images.length) % images.length);
@@ -32,7 +34,7 @@ export const Carousel = () => {
       <div className="carousel-frame">
         {images.map((img, index) => (
           <div
-            key={index}
+            key={`${img}-${index}`}
             className={`carousel-slide ${index === currentIndex ? 'active' : ''}`}
             style={{ '--slide-bg': `url(${img})` }}
           >

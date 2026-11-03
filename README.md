@@ -1,5 +1,42 @@
 # React + Vite
 
+## Supabase
+
+Configure `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `.env.local`.
+For a new database, run `supabase_schema.sql` and then
+`supabase_appointment_availability.sql` in the Supabase SQL Editor.
+For an existing database, back it up and run these scripts in order:
+
+1. `supabase_appointments_migration.sql` migrates the old booking schema. It
+   keeps rows only when all required booking fields can be mapped, and stops if
+   data is incomplete or a legacy table has an external foreign-key dependency.
+2. `supabase_admin_cms.sql` applies administrator-only access, creates the
+   `contact_messages` table and configures the public image bucket.
+3. `supabase_appointment_availability.sql` enables 30-minute availability,
+   exposes only reserved times publicly, and prevents duplicate bookings.
+
+The public booking and contact forms can submit only their form fields.
+Only authenticated users with `public.users.role = 'admin'` can read bookings
+and messages or modify site content. Public users can read `site_content`,
+reserved time slots, and public site images, but cannot read submitted contact
+or booking details.
+After the scripts, promote the trusted administrator account in the SQL Editor:
+
+```sql
+UPDATE public.users SET role = 'admin' WHERE email = 'SEU_EMAIL_ADMIN';
+```
+
+The login page keeps an unvalidated demonstration entry. In demo mode, content
+and images can be edited and previewed in the same browser; demo changes are
+stored locally and are not published to Supabase or visible to other visitors.
+To publish content or access private appointments and messages, use the
+separate Supabase Auth form with an account whose `public.users.role = 'admin'`.
+The frontend uses only the anon key from `.env.local`, never the `service_role`
+key; demo access does not bypass RLS.
+
+The schema does not seed placeholder site content. Enter the real content in
+the admin editor after promoting the administrator account.
+
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
 Currently, two official plugins are available:

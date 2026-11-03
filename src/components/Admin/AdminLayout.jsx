@@ -1,6 +1,8 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Home as HomeIcon, Info, Scissors, DollarSign, Users, Image, Phone, LogOut } from 'lucide-react';
+import { LayoutDashboard, Home as HomeIcon, Info, Scissors, DollarSign, Users, Image, Phone, LogOut, CalendarDays, Mail } from 'lucide-react';
 import { supabase } from '../../services/supabaseClient';
+import { clearDemoAccess, hasDemoAccess } from '../../lib/demoAccess';
+import toast from 'react-hot-toast';
 
 const navItems = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -11,13 +13,25 @@ const navItems = [
   { to: '/admin/equipe', label: 'Equipe', icon: Users },
   { to: '/admin/galeria', label: 'Galeria', icon: Image },
   { to: '/admin/contato', label: 'Contato', icon: Phone },
+  { to: '/admin/agendamentos', label: 'Agendamentos', icon: CalendarDays },
+  { to: '/admin/mensagens', label: 'Mensagens', icon: Mail },
 ];
 
 export const AdminLayout = () => {
   const navigate = useNavigate();
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    if (hasDemoAccess()) {
+      clearDemoAccess();
+      navigate('/login');
+      return;
+    }
+
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     navigate('/login');
   };
 

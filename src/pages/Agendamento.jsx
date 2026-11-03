@@ -1,59 +1,129 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Navbar } from '../components/Navbar/Navbar';
+import { SiteFooter } from '../components/SiteFooter';
 import { Calendar, Clock, User, Phone, FileText, Send } from 'lucide-react';
-import { supabase } from '../services/supabaseClient';
+import { getReservedAppointmentTimes, submitAppointment } from '../services/appointmentService';
+import { usePageContent } from '../hooks/usePageContent';
 import toast from 'react-hot-toast';
 
 /**
  * Página de agendamento para a barbearia - Estilo Pirata! 🏴‍☠️
  * Utiliza Tailwind CSS para estilização temática.
- * Campos: nome, telefone, descrição, data e horário.
+ * Campos: nome, telefone, serviço, data e horário.
  */
 const Agendamento = () => {
   const navigate = useNavigate();
+  const { content: bookingContent } = usePageContent('agendamento');
+  const now = new Date();
+  const minimumBookingDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const [loading, setLoading] = useState(false);
+  const [reservedTimes, setReservedTimes] = useState([]);
+  const [loadingTimes, setLoadingTimes] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState('');
   const [form, setForm] = useState({
     nome: '',
     telefone: '',
-    descricao: '',
+    servico: '',
     data: '',
     horario: '',
   });
 
+  const timeSlots = useMemo(() => {
+    const slots = [];
+    for (let minutes = 9 * 60; minutes < 18 * 60; minutes += 30) {
+      const hours = String(Math.floor(minutes / 60)).padStart(2, '0');
+      const slotMinutes = String(minutes % 60).padStart(2, '0');
+      slots.push(`${hours}:${slotMinutes}`);
+    }
+    return slots;
+  }, []);
+
+  const isClosedDay = form.data
+    ? [0, 6].includes(new Date(`${form.data}T12:00:00`).getDay())
+    : false;
+
+  useEffect(() => {
+    let active = true;
+
+    if (!form.data || isClosedDay) {
+      setReservedTimes([]);
+      setAvailabilityError('');
+      setLoadingTimes(false);
+      return () => {
+        active = false;
+      };
+    }
+
+    setLoadingTimes(true);
+    setAvailabilityError('');
+    setReservedTimes([]);
+    getReservedAppointmentTimes(form.data)
+      .then((times) => {
+        if (active) setReservedTimes(times);
+      })
+      .catch((error) => {
+        console.error('Erro ao verificar horários reservados:', error);
+        if (active) setAvailabilityError(error.message || 'Não foi possível verificar os horários disponíveis.');
+      })
+      .finally(() => {
+        if (active) setLoadingTimes(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [form.data, isClosedDay]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    setForm((prev) => ({ ...prev, [name]: value, ...(name === 'data' ? { horario: '' } : {}) }));
+  };
+
+  const handlePhoneChange = (e) => {
+    const digits = e.target.value.replace(/\D/g, '').slice(0, 11);
+    let telefone = digits;
+
+    if (digits.length > 0) telefone = `(${digits.slice(0, 2)}`;
+    if (digits.length >= 3) telefone += `) ${digits.slice(2, 7)}`;
+    if (digits.length >= 8) telefone += `-${digits.slice(7, 11)}`;
+
+    setForm((prev) => ({ ...prev, telefone }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
-
-    const { error } = await supabase.rpc('criar_agendamento', {
-      p_nome: form.nome,
-      p_telefone: form.telefone,
-      p_descricao: form.descricao,
-      p_data: form.data,
-      p_horario: form.horario,
-    });
-
-    setLoading(false);
-
-    if (error) {
-      if (error.message.includes('HORARIO_INDISPONIVEL')) {
-        toast.error('Esse horário está muito próximo de outro agendamento. É preciso um intervalo de 30 minutos, capitão.');
-      } else {
-        toast.error('Erro ao criar agendamento: ' + error.message);
-      }
+    if (!/^\(\d{2}\) \d{5}-\d{4}$/.test(form.telefone)) {
+      toast.error('Informe um telefone com DDD no formato (00) 00000-0000.');
+      return;
+    }
+    if (!form.horario || reservedTimes.includes(form.horario) || availabilityError || loadingTimes) {
+      toast.error('Selecione um horário disponível.');
       return;
     }
 
-    toast.success('Agendamento realizado com sucesso!');
-    navigate('/');
+    setLoading(true);
+
+    try {
+      await submitAppointment({
+        nome: form.nome.trim(),
+        telefone: form.telefone.trim(),
+        servico: form.servico.trim(),
+        data: form.data,
+        horario: form.horario,
+      });
+
+      toast.success('Agendamento realizado com sucesso!');
+      navigate('/');
+    } catch (error) {
+      console.error('Erro ao criar agendamento:', error);
+      toast.error(`Erro ao criar agendamento: ${error.message || 'erro inesperado.'}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
-      return (
+  return (
     <div className="min-h-screen bg-[#0f0a07] text-[#f3e5ab] relative overflow-hidden">
       <Navbar />
 
@@ -68,17 +138,16 @@ const Agendamento = () => {
               className="text-xs md:text-sm font-semibold tracking-[0.3em] text-[#d4af37] uppercase mb-3 block"
               style={{ fontFamily: "'Cinzel Decorative', serif" }}
             >
-              Tradição & Estilo Clássico
+              {bookingContent?.agendamento_badge || 'Tradição & Estilo Clássico'}
             </span>
             <h1
               className="text-4xl md:text-6xl font-black mb-4 text-transparent bg-clip-text bg-gradient-to-b from-[#f9e7b2] via-[#d4af37] to-[#9c752b] drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)]"
               style={{ fontFamily: "'Cinzel Decorative', 'Pirata One', serif" }}
             >
-              Agende Seu Horário
+              {bookingContent?.agendamento_title || 'Agende Seu Horário'}
             </h1>
             <p className="text-gray-300 max-w-xl mx-auto text-sm md:text-base">
-              Cadastre-se na nossa barbearia e garanta seu lugar entre os mestres
-              do estilo. Uma navinha com cara de pirata é a sua recompensa! 🏴‍☠️
+              {bookingContent?.agendamento_subtitle || 'Cadastre-se na nossa barbearia e garanta seu lugar entre os mestres do estilo. Uma navinha com cara de pirata é a sua recompensa! 🏴‍☠️'}
             </p>
           </div>
 
@@ -133,29 +202,35 @@ const Agendamento = () => {
                   type="tel"
                   id="telefone"
                   name="telefone"
+                  inputMode="numeric"
+                  maxLength={15}
+                  pattern="\(\d{2}\) \d{5}-\d{4}"
+                  title="Use o formato (00) 00000-0000 com 11 números."
                   value={form.telefone}
-                  onChange={handleChange}
+                  onChange={handlePhoneChange}
                   required
-                  placeholder="(11) 99999-9999"
+                  placeholder="(00) 00000-0000"
                   className="w-full px-4 py-3 bg-[#22130c] border-2 border-[#5a371c] rounded-xl text-[#f3e5ab] placeholder-[#a67c52] focus:outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/40 transition-all"
                 />
               </div>
-                                    {/* Descrição */}
+
+              {/* Serviço */}
               <div>
                 <label
-                  htmlFor="descricao"
+                  htmlFor="servico"
                   className="flex items-center gap-2 text-sm font-semibold text-[#d4af37] mb-2"
                   style={{ fontFamily: "'Cinzel Decorative', serif" }}
                 >
-                  <FileText className="w-4 h-4 text-[#d4af37]" /> Descrição
+                  <FileText className="w-4 h-4 text-[#d4af37]" /> Serviço
                 </label>
                 <textarea
-                  id="descricao"
-                  name="descricao"
-                  value={form.descricao}
+                  id="servico"
+                  name="servico"
+                  value={form.servico}
                   onChange={handleChange}
                   rows="3"
-                  placeholder="Conte-nos qual serviço deseja..."
+                  required
+                  placeholder="Qual serviço deseja agendar?"
                   className="w-full px-4 py-3 bg-[#22130c] border-2 border-[#5a371c] rounded-xl text-[#f3e5ab] placeholder-[#a67c52] focus:outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/40 transition-all resize-none"
                 />
               </div>
@@ -173,10 +248,11 @@ const Agendamento = () => {
                   type="date"
                   id="data"
                   name="data"
+                  min={minimumBookingDate}
                   value={form.data}
                   onChange={handleChange}
                   required
-                  className="w-full px-4 py-3 bg-[#22130c] border-2 border-[#5a371c] rounded-xl text-[#f3e5ab] placeholder-[#a67c52] focus:outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/40 transition-all"
+                  className="booking-date-time w-full px-4 py-3 bg-[#22130c] border-2 border-[#5a371c] rounded-xl text-[#f3e5ab] placeholder-[#a67c52] focus:outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/40 transition-all"
                 />
               </div>
 
@@ -189,15 +265,45 @@ const Agendamento = () => {
                 >
                   <Clock className="w-4 h-4 text-[#d4af37]" /> Horário
                 </label>
-                <input
-                  type="time"
-                  id="horario"
-                  name="horario"
-                  value={form.horario}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-3 bg-[#22130c] border-2 border-[#5a371c] rounded-xl text-[#f3e5ab] placeholder-[#a67c52] focus:outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/40 transition-all"
-                />
+                {!form.data ? (
+                  <p className="text-sm text-gray-400">Selecione uma data para ver os horários.</p>
+                ) : isClosedDay ? (
+                  <p role="status" className="text-sm text-amber-200">Não há atendimento aos sábados e domingos. Escolha um dia útil.</p>
+                ) : loadingTimes ? (
+                  <p role="status" className="text-sm text-gray-400">Verificando horários disponíveis...</p>
+                ) : availabilityError ? (
+                  <p role="alert" className="text-sm text-red-300">{availabilityError}</p>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2" role="group" aria-label="Horários disponíveis">
+                      {timeSlots.map((time) => {
+                        const reserved = reservedTimes.includes(time);
+                        const selected = form.horario === time;
+
+                        return (
+                          <button
+                            key={time}
+                            type="button"
+                            disabled={reserved}
+                            aria-pressed={selected}
+                            aria-label={reserved ? `${time}, reservado` : time}
+                            onClick={() => setForm((prev) => ({ ...prev, horario: time }))}
+                            className={`rounded-lg border px-3 py-3 text-sm font-semibold transition-colors ${
+                              reserved
+                                ? 'cursor-not-allowed border-gray-700 bg-gray-800/70 text-gray-500 line-through'
+                                : selected
+                                  ? 'border-[#f5d78e] bg-[#d4af37] text-[#1a0f08]'
+                                  : 'border-[#5a371c] bg-[#22130c] text-[#f3e5ab] hover:border-[#d4af37]'
+                            }`}
+                          >
+                            {time}{reserved ? ' · Reservado' : ''}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-2 text-xs text-gray-400">Horários de 30 em 30 minutos. Os horários reservados aparecem apagados.</p>
+                  </>
+                )}
               </div>
 
               {/* Botão de envio - estilo dourado pirata */}
@@ -214,26 +320,7 @@ const Agendamento = () => {
         </div>
       </main>
 
-      {/* Rodapé estilo pirata */}
-      <footer className="relative z-10 py-12 px-6 bg-[#0a0503] border-t-4 border-[#5a371c] text-center text-gray-400 mt-auto">
-        <div className="container mx-auto max-w-4xl">
-          <span
-            className="text-base font-bold tracking-widest text-[#d4af37] uppercase block mb-2"
-            style={{ fontFamily: "'Cinzel Decorative', serif" }}
-          >
-            Barbershop Corte & Estilo
-          </span>
-          <p className="mb-2 text-sm">Endereço: Rua da Barbearia, 123 - Centro</p>
-          <p className="mb-6 text-sm">Telefone / WhatsApp: (11) 99999-9999</p>
-          <div className="flex gap-6 justify-center mb-8 text-sm text-[#f3e5ab]">
-            <span>Instagram: @corteestilo</span>
-            <span>Segunda a Sábado: 09h às 20h</span>
-          </div>
-          <p className="text-xs text-gray-600">
-            © 2026 Barbershop Corte & Estilo. Todos os direitos reservados.
-          </p>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 };

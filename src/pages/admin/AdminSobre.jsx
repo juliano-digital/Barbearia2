@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import { Trash2 } from 'lucide-react';
 import { AdminPageHeader } from '../../components/Admin/AdminPageHeader';
 import { getPageContent, savePageContent } from '../../services/siteContentService';
 import { uploadImage, deleteImage } from '../../services/imageUploadService';
@@ -11,12 +12,19 @@ export const AdminSobre = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [pendingDeletes, setPendingDeletes] = useState([]);
 
   useEffect(() => {
     const load = async () => {
-      const data = await getPageContent('sobre');
-      if (data) setSobre((prev) => ({ ...prev, ...data }));
-      setLoading(false);
+      try {
+        const data = await getPageContent('sobre');
+        if (data) setSobre((prev) => ({ ...prev, ...data }));
+      } catch (error) {
+        console.error('Erro ao carregar conteúdo Sobre:', error);
+        toast.error(`Erro ao carregar conteúdo: ${error.message}`);
+      } finally {
+        setLoading(false);
+      }
     };
     load();
   }, []);
@@ -29,12 +37,20 @@ export const AdminSobre = () => {
       const oldUrl = sobre.sobre_image;
       const url = await uploadImage(file, 'sobre');
       setSobre((prev) => ({ ...prev, sobre_image: url }));
-      if (oldUrl) await deleteImage(oldUrl);
+      if (oldUrl) setPendingDeletes((prev) => [...new Set([...prev, oldUrl])]);
       toast.success('Imagem enviada');
-    } catch {
-      toast.error('Erro ao enviar imagem');
+    } catch (error) {
+      console.error('Erro ao enviar imagem da página Sobre:', error);
+      toast.error(`Erro ao enviar imagem: ${error.message}`);
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleImageRemove = () => {
+    if (sobre.sobre_image) {
+      setPendingDeletes((prev) => [...new Set([...prev, sobre.sobre_image])]);
+      setSobre((prev) => ({ ...prev, sobre_image: '' }));
     }
   };
 
@@ -42,9 +58,20 @@ export const AdminSobre = () => {
     setSaving(true);
     try {
       await savePageContent('sobre', sobre);
+    } catch (error) {
+      console.error('Erro ao salvar conteúdo Sobre:', error);
+      toast.error(`Erro ao salvar conteúdo: ${error.message}`);
+      setSaving(false);
+      return;
+    }
+
+    try {
+      await Promise.all(pendingDeletes.map(deleteImage));
+      setPendingDeletes([]);
       toast.success('Conteúdo da página Sobre salvo');
-    } catch {
-      toast.error('Erro ao salvar. Verifique se seu usuário é admin.');
+    } catch (error) {
+      console.error('Conteúdo Sobre salvo, mas uma imagem antiga não foi removida:', error);
+      toast.error(`Conteúdo salvo, mas não foi possível limpar uma imagem antiga: ${error.message}`);
     } finally {
       setSaving(false);
     }
@@ -76,9 +103,18 @@ export const AdminSobre = () => {
         <div>
           <label className="block text-xs mb-1.5">Imagem</label>
           {sobre.sobre_image && (
-            <img src={sobre.sobre_image} alt="Sobre" className="w-full max-w-xs rounded-md border border-black mb-2" />
+            <div className="mb-2 w-full max-w-xs">
+              <img src={sobre.sobre_image} alt="Sobre" className="w-full rounded-md border border-black" />
+              <button type="button" onClick={handleImageRemove} disabled={uploading || saving}
+                className="mt-2 flex items-center gap-1.5 text-xs text-red-600 hover:text-red-800 disabled:opacity-50">
+                <Trash2 size={14} /> Excluir imagem
+              </button>
+            </div>
           )}
-          <input type="file" accept="image/*" onChange={handleImageChange} disabled={uploading} className="text-sm" />
+          <label className="inline-flex items-center mt-1 border border-black rounded-md px-3 py-2 text-sm cursor-pointer hover:bg-gray-50">
+            {uploading ? 'Enviando...' : 'Carregar imagem'}
+            <input type="file" accept="image/*" onChange={handleImageChange} disabled={uploading} className="hidden" />
+          </label>
           {uploading && <p className="text-xs text-gray-500 mt-1">Enviando imagem...</p>}
         </div>
 

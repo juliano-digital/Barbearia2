@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Calendar, Menu, X, Scissors } from 'lucide-react';
+import { Calendar, Menu, X } from 'lucide-react';
 import { BottomNavBar } from './BottomNavBar';
 import { supabase } from '../../services/supabaseClient';
+import { usePageContent } from '../../hooks/usePageContent';
 
 export const Navbar = () => {
   const [menuAberto, setMenuAberto] = useState(false);
   const [session, setSession] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
   const navigate = useNavigate();
+  const { content: site } = usePageContent('site');
 
   useEffect(() => {
     // Verifica a sessão atual
@@ -63,7 +65,7 @@ export const Navbar = () => {
           <img src="/Img/escritalogo.png" alt="Barbershop" className="h-14 md:h-20 w-auto object-contain drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
           <span className="sr-only">Barbershop</span>
           <span className="text-[10px] md:text-xs font-semibold tracking-[0.25em] text-[#d4af37] uppercase drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] whitespace-nowrap" style={{ fontFamily: "'Cinzel Decorative', serif" }}>
-            CORTE & ESTILO
+            {site?.brand}
           </span>
         </Link>
 
