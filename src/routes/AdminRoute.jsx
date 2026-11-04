@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
-import { hasDemoAccess } from '../lib/demoAccess';
+import { clearDemoAccess } from '../lib/demoAccess';
 
 export const AdminRoute = () => {
   const [status, setStatus] = useState('checking');
@@ -10,11 +10,6 @@ export const AdminRoute = () => {
     let active = true;
 
     const checkAdmin = async () => {
-      if (hasDemoAccess()) {
-        if (active) setStatus('allowed');
-        return;
-      }
-
       try {
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
         if (sessionError) throw sessionError;
@@ -32,6 +27,7 @@ export const AdminRoute = () => {
           .single();
         if (error) throw error;
 
+        if (userRow?.role === 'admin') clearDemoAccess();
         if (active) setStatus(userRow?.role === 'admin' ? 'allowed' : 'denied');
       } catch (error) {
         console.error('Erro ao verificar permissão administrativa:', error);
@@ -51,5 +47,5 @@ export const AdminRoute = () => {
     return <div className="flex items-center justify-center min-h-screen bg-white text-black text-sm">Verificando permissão...</div>;
   }
 
-  return status === 'allowed' ? <Outlet /> : <Navigate to="/login" replace />;
+  return status === 'allowed' ? <Outlet /> : <Navigate to="/admin/login" replace />;
 };

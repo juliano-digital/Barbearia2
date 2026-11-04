@@ -67,7 +67,12 @@ export const AdminAgendamentos = () => {
       setAppointments(await getAppointments(dateFilter));
     } catch (loadError) {
       console.error('Erro ao carregar agendamentos:', loadError);
-      setError(loadError.message || 'Falha inesperada ao consultar agendamentos.');
+      const message = loadError.message || 'Falha inesperada ao consultar agendamentos.';
+      setError(
+        message.includes('permission denied for table appointments')
+          ? 'O Supabase ainda não liberou a leitura administrativa de agendamentos. Execute supabase_appointments_admin_read.sql no SQL Editor do projeto Supabase e tente novamente.'
+          : message
+      );
     } finally {
       setLoading(false);
     }

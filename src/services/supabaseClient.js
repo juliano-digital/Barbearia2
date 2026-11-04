@@ -23,6 +23,7 @@ export const supabase = hasValidCreds
         signUp: async () => ({ data: null, error: { message: 'Supabase não configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no arquivo .env.local.' } }),
         signInWithPassword: async () => ({ data: null, error: { message: 'Supabase não configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no arquivo .env.local.' } }),
         signOut: async () => ({ error: { message: 'Supabase não configurado.' } }),
+        getSession: async () => ({ data: { session: null }, error: null }),
         getUser: async () => ({ data: { user: null }, error: { message: 'Supabase não configurado.' } }),
         resetPasswordForEmail: async () => ({ error: { message: 'Supabase não configurado.' } }),
         onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),

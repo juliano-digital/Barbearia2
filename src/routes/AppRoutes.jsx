@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Home } from '../pages/Home';
 import { SignUp } from '../pages/SignUp';
 import { Login } from '../pages/Login';
+import { AdminLogin } from '../pages/AdminLogin';
 import { ForgotPassword } from '../pages/ForgotPassword';
 import { Profile } from '../pages/Profile';
 import Agendamento from '../pages/Agendamento';
@@ -35,6 +36,7 @@ export const AppRoutes = () => {
         {/* Rotas Públicas */}
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/cadastro" element={<SignUp />} />
         <Route path="/recuperar-senha" element={<ForgotPassword />} />
         <Route path="/agendamento" element={<Agendamento />} />

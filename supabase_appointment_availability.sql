@@ -79,3 +79,5 @@ REVOKE ALL ON FUNCTION public.create_public_appointment(TEXT, TEXT, TEXT, DATE, 
 GRANT EXECUTE ON FUNCTION public.create_public_appointment(TEXT, TEXT, TEXT, DATE, TIME) TO anon, authenticated;
 
 COMMIT;
+
+NOTIFY pgrst, 'reload schema';

@@ -15,24 +15,37 @@ For an existing database, back it up and run these scripts in order:
 3. `supabase_appointment_availability.sql` enables 30-minute availability,
    exposes only reserved times publicly, and prevents duplicate bookings.
 
-The public booking and contact forms can submit only their form fields.
-Only authenticated users with `public.users.role = 'admin'` can read bookings
-and messages or modify site content. Public users can read `site_content`,
-reserved time slots, and public site images, but cannot read submitted contact
-or booking details.
+If the admin appointment page reports `permission denied for table
+appointments`, run `supabase_appointments_admin_read.sql` in the SQL Editor for
+that same Supabase project. It grants table access to authenticated users while
+the row-level security policy continues to limit appointment data to admins.
+
+The public booking and contact forms write directly to Supabase. Only
+authenticated users with `public.users.role = 'admin'` can read bookings and
+messages or modify site content. Public users can read `site_content`, reserved
+time slots, and public site images, but cannot read submitted contact or booking
+details.
 After the scripts, promote the trusted administrator account in the SQL Editor:
 
 ```sql
-UPDATE public.users SET role = 'admin' WHERE email = 'SEU_EMAIL_ADMIN';
+INSERT INTO public.users (id, nome, email, role)
+SELECT
+  id,
+  COALESCE(NULLIF(raw_user_meta_data->>'nome', ''), split_part(email, '@', 1)),
+  email,
+  'admin'
+FROM auth.users
+WHERE lower(email) = lower('SEU_EMAIL_ADMIN')
+ON CONFLICT (id) DO UPDATE SET role = 'admin'
+RETURNING id, email, role;
 ```
 
-The login page keeps an unvalidated demonstration entry. In demo mode, content
-and images can be edited and previewed in the same browser; demo changes are
-stored locally and are not published to Supabase or visible to other visitors.
-To publish content or access private appointments and messages, use the
-separate Supabase Auth form with an account whose `public.users.role = 'admin'`.
-The frontend uses only the anon key from `.env.local`, never the `service_role`
-key; demo access does not bypass RLS.
+Users sign in at `/login`; administrators use `/admin/login` with the same
+Supabase Auth email and password. The administrator login additionally checks
+that `public.users.role = 'admin'`. Unauthenticated users opening the admin
+panel are redirected to `/admin/login`. The frontend uses only the anon key
+from `.env.local`, never the `service_role` key; database row-level security
+remains enabled.
 
 The schema does not seed placeholder site content. Enter the real content in
 the admin editor after promoting the administrator account.
